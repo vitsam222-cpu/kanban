@@ -93,6 +93,31 @@ function openCardDialog(columnId, cardId = null) {
     </form>
   `
 
+  const form = dialog.querySelector('form')
+  form.elements.client.value = card?.client ?? ''
+  form.elements.service.value = card?.service ?? ''
+  form.elements.price.value = card?.price ?? ''
+  form.elements.messenger.value = card?.messenger ?? ''
+  form.elements.phone.value = card?.phone ?? ''
+
+  dialog.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => dialog.close()))
+  form.addEventListener('submit', (event) => {
+    event.preventDefault()
+    const payload = {
+      client: form.elements.client.value.trim(),
+      service: form.elements.service.value.trim(),
+      price: Number(form.elements.price.value) || 0,
+      messenger: form.elements.messenger.value.trim(),
+      phone: form.elements.phone.value.trim(),
+    }
+
+    if (!payload.client || !payload.service) return
+
+    updateColumn(columnId, (columnState) => ({
+      ...columnState,
+      cards: card
+        ? columnState.cards.map((item) => (item.id === card.id ? { ...item, ...payload } : item))
+        : [...columnState.cards, { id: createId('card'), ...payload }],
   dialog.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => dialog.close()))
   dialog.querySelector('form').addEventListener('submit', (event) => {
     event.preventDefault()
@@ -132,6 +157,11 @@ function onDragStart(event) {
   const cardEl = event.target.closest('[data-card-id]')
 
   if (cardEl) {
+    event.dataTransfer.setData('application/json', JSON.stringify({
+      type: 'card',
+      cardId: cardEl.dataset.cardId,
+      fromColumnId: cardEl.dataset.parentColumnId,
+    }))
     event.dataTransfer.setData('application/json', JSON.stringify({ type: 'card', cardId: cardEl.dataset.cardId, fromColumnId: cardEl.dataset.parentColumnId }))
     event.dataTransfer.effectAllowed = 'move'
     return
@@ -147,6 +177,7 @@ function onDrop(event) {
   event.preventDefault()
   const raw = event.dataTransfer.getData('application/json')
   if (!raw) return
+
   const payload = JSON.parse(raw)
   const targetCard = event.target.closest('[data-card-id]')
   const targetColumn = event.target.closest('[data-column-id]')
@@ -156,6 +187,7 @@ function onDrop(event) {
     const fromIndex = state.columns.findIndex((column) => column.id === payload.columnId)
     const toIndex = state.columns.findIndex((column) => column.id === targetColumn.dataset.columnId)
     if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return
+
     state.columns = moveItem(state.columns, fromIndex, toIndex)
     saveState()
     render()
@@ -163,12 +195,19 @@ function onDrop(event) {
   }
 
   if (payload.type !== 'card') return
+
   const sourceColumn = state.columns.find((column) => column.id === payload.fromColumnId)
   const destinationColumn = state.columns.find((column) => column.id === targetColumn.dataset.columnId)
   if (!sourceColumn || !destinationColumn) return
 
   const cardIndex = sourceColumn.cards.findIndex((card) => card.id === payload.cardId)
   if (cardIndex < 0) return
+
+  const [card] = sourceColumn.cards.splice(cardIndex, 1)
+  const insertIndex = targetCard
+    ? destinationColumn.cards.findIndex((item) => item.id === targetCard.dataset.cardId)
+    : destinationColumn.cards.length
+
   const [card] = sourceColumn.cards.splice(cardIndex, 1)
   const insertIndex = targetCard ? destinationColumn.cards.findIndex((item) => item.id === targetCard.dataset.cardId) : destinationColumn.cards.length
   destinationColumn.cards.splice(insertIndex < 0 ? destinationColumn.cards.length : insertIndex, 0, card)
@@ -189,6 +228,8 @@ function render() {
         </div>
       </header>
 
+      <main class="board-grid" id="board-grid">
+        ${visibleColumns.map(({ column, visibleCards }) => {
       <header class="topbar">
         <div class="topbar-actions">
           <div class="summary-card">
@@ -225,6 +266,7 @@ function render() {
               </div>
               <button class="ghost-btn" data-action="add-card" data-column-id="${column.id}">+ Быстро добавить</button>
               <div class="card-list">
+                ${visibleCards.length ? visibleCards.map((card) => `
                 ${column.cards.length ? column.cards.map((card) => `
                   <article class="card" draggable="true" data-card-id="${card.id}" data-parent-column-id="${column.id}">
                     <div class="card-head">
@@ -253,6 +295,7 @@ function render() {
   document.querySelector('#add-column-btn').addEventListener('click', () => {
     const title = prompt('Название новой колонки')
     if (!title?.trim()) return
+
     state.columns.push({ id: createId('col'), title: title.trim(), cards: [] })
     saveState()
     render()
@@ -277,11 +320,13 @@ function render() {
     const column = state.columns.find((item) => item.id === button.dataset.columnId)
     const title = prompt('Новое название колонки', column?.title ?? '')
     if (!title?.trim()) return
+
     updateColumn(button.dataset.columnId, (columnState) => ({ ...columnState, title: title.trim() }))
   }))
   app.querySelectorAll('[data-action="delete-column"]').forEach((button) => button.addEventListener('click', () => {
     const column = state.columns.find((item) => item.id === button.dataset.columnId)
     if (!column || !confirm(`Удалить колонку «${column.title}» со всеми карточками?`)) return
+
     state.columns = state.columns.filter((item) => item.id !== button.dataset.columnId)
     saveState()
     render()

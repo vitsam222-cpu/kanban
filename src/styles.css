@@ -9,10 +9,10 @@ body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top, 
 button, input, select { font: inherit; }
 button { cursor: pointer; border: none; }
 
-.app-shell { padding: 14px; }
-.topbar, .toolbar, .topbar-actions, .modal-header, .modal-actions, .card-head, .card-actions { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.app-shell { padding: 12px; }
+.topbar, .toolbar, .topbar-actions, .modal-header, .modal-actions, .card-head, .card-actions { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
 .topbar, .toolbar { flex-wrap: wrap; }
-.compact-header { margin-bottom: 10px; }
+.topbar { margin-bottom: 8px; }
 .summary-card, .search-input, .filter-select, .column, dialog.modal { background: rgba(15, 23, 42, .92); border: 1px solid rgba(148, 163, 184, .14); border-radius: 14px; }
 .summary-card { min-width: 170px; padding: 10px 12px; display: grid; gap: 2px; font-size: 12px; }
 .summary-card strong { font-size: 16px; }
@@ -20,9 +20,9 @@ button { cursor: pointer; border: none; }
 .secondary-btn { background: #334155; }
 .ghost-btn { width: 100%; margin: 8px 0; background: rgba(37, 99, 235, .1); color: #93c5fd; border: 1px dashed rgba(147, 197, 253, .28); }
 .search-input, .filter-select { padding: 9px 10px; color: #fff; font-size: 12px; }
-.search-input { min-width: min(320px, 100%); }
-.board-grid { display: grid; grid-template-columns: repeat(6, minmax(150px, 1fr)); gap: 10px; overflow-x: auto; padding-bottom: 10px; }
-.column { padding: 10px; min-height: 60vh; font-size: 12px; }
+.search-input { min-width: min(280px, 100%); }
+.board-grid { display: grid; grid-template-columns: repeat(6, minmax(140px, 1fr)); gap: 8px; overflow-x: auto; padding-bottom: 8px; }
+.column { padding: 9px; min-height: 60vh; font-size: 11px; }
 .column.income { box-shadow: inset 0 0 0 1px rgba(34, 197, 94, .22); }
 .column.expense { box-shadow: inset 0 0 0 1px rgba(248, 113, 113, .22); }
 .column-header { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
@@ -48,10 +48,10 @@ dialog.modal::backdrop { background: rgba(2, 6, 23, .72); }
 .modal-form input { border-radius: 10px; border: 1px solid rgba(148, 163, 184, .18); background: #0f172a; color: #fff; padding: 10px 12px; font-size: 12px; }
 
 @media (max-width: 1024px) {
-  .app-shell { padding: 12px; }
-  .board-grid { grid-template-columns: repeat(6, minmax(150px, 180px)); }
+  .app-shell { padding: 10px; }
+  .board-grid { grid-template-columns: repeat(6, minmax(140px, 168px)); }
 }
 
 @media (max-width: 900px) {
-  .board-grid { grid-template-columns: repeat(6, minmax(145px, 170px)); }
+  .board-grid { grid-template-columns: repeat(6, minmax(138px, 160px)); }
 }

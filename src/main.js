@@ -183,7 +183,7 @@ function render() {
 
   app.innerHTML = `
     <div class="app-shell">
-      <header class="topbar compact-header">
+      <header class="topbar">
         <div class="topbar-actions">
           <div class="summary-card">
             <span>Баланс по доске</span>

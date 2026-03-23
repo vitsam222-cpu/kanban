@@ -10,6 +10,7 @@ function createId(prefix) {
 function createDefaultState() {
   return {
     columns: defaultColumns.map((title) => ({ id: createId('col'), title, cards: [] })),
+    filters: { query: '' },
     filters: { query: '', columnId: 'all' },
   }
 }
@@ -21,6 +22,7 @@ function loadState() {
     const parsed = JSON.parse(raw)
     return {
       columns: Array.isArray(parsed.columns) ? parsed.columns : createDefaultState().columns,
+      filters: { query: '' },
       filters: { query: '', columnId: 'all' },
     }
   } catch {
@@ -52,9 +54,7 @@ function getBoardBalance() {
 }
 
 function getVisibleColumns() {
-  const base = state.filters.columnId === 'all'
-    ? state.columns
-    : state.columns.filter((column) => column.id === state.filters.columnId)
+  const base = state.columns
 
   const query = state.filters.query.trim().toLowerCase()
   if (!query) return base
@@ -183,6 +183,13 @@ function render() {
 
   app.innerHTML = `
     <div class="app-shell">
+      <header class="topbar toolbar-row">
+        <div class="toolbar-left">
+          <button class="primary-btn" id="add-column-btn">+ Колонка</button>
+          <input class="search-input" id="search-input" placeholder="Поиск по клиентам, услугам" value="${state.filters.query}" />
+        </div>
+      </header>
+
       <header class="topbar">
         <div class="topbar-actions">
           <div class="summary-card">

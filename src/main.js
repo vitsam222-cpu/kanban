@@ -184,11 +184,6 @@ function render() {
   app.innerHTML = `
     <div class="app-shell">
       <header class="topbar">
-        <div>
-          <p class="eyebrow">Мини CRM</p>
-          <h1>Финансовая kanban-доска</h1>
-          <p class="subtitle">Каждый клиент = деньги. Доход и расходы видны сразу.</p>
-        </div>
         <div class="topbar-actions">
           <div class="summary-card">
             <span>Баланс по доске</span>

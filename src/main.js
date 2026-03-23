@@ -255,8 +255,7 @@ function render() {
                   <div><dt>Телефон</dt><dd>${card.phone || '—'}</dd></div>
                 </dl>
                 <div class="card-actions">
-                  <button data-action="edit-card" data-column-id="${column.id}" data-card-id="${card.id}">Редактировать</button>
-                  <button data-action="delete-card" data-column-id="${column.id}" data-card-id="${card.id}">Удалить</button>
+                  <button class="danger-btn" data-action="delete-card" data-column-id="${column.id}" data-card-id="${card.id}">Удалить</button>
                 </div>
               </article>
             `).join('') : '<div class="empty-state">Перетащите сюда карточку или создайте новую.</div>'}
@@ -267,10 +266,13 @@ function render() {
   `
 
   board.querySelectorAll('[data-action="add-card"]').forEach((button) => button.addEventListener('click', () => openCardDialog(button.dataset.columnId)))
-  board.querySelectorAll('[data-action="edit-card"]').forEach((button) => button.addEventListener('click', () => openCardDialog(button.dataset.columnId, button.dataset.cardId)))
-  board.querySelectorAll('[data-action="delete-card"]').forEach((button) => button.addEventListener('click', () => {
-    updateColumn(button.dataset.columnId, (column) => ({ ...column, cards: column.cards.filter((card) => card.id !== button.dataset.cardId) }))
-  }))
+  board.querySelectorAll('[data-action="delete-card"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      updateColumn(button.dataset.columnId, (column) => ({ ...column, cards: column.cards.filter((card) => card.id !== button.dataset.cardId) }))
+    })
+    button.addEventListener('dblclick', (event) => event.stopPropagation())
+  })
+  board.querySelectorAll('[data-card-id]').forEach((card) => card.addEventListener('dblclick', () => openCardDialog(card.dataset.parentColumnId, card.dataset.cardId)))
   board.querySelectorAll('[data-action="rename-column"]').forEach((button) => button.addEventListener('click', () => {
     const column = state.columns.find((item) => item.id === button.dataset.columnId)
     const title = prompt('Новое название колонки', column?.title ?? '')

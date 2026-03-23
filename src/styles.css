@@ -10,12 +10,13 @@ button, input, select { font: inherit; }
 button { cursor: pointer; border: none; }
 
 .app-shell { padding: 12px; }
-.topbar, .modal-header, .modal-actions, .card-head, .card-actions, .toolbar-left { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.topbar, .modal-header, .modal-actions, .card-head, .toolbar-left { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
 .topbar { margin-bottom: 8px; flex-wrap: nowrap; }
 .toolbar-left { flex-wrap: nowrap; width: 100%; justify-content: flex-start; }
 .toolbar-row { justify-content: flex-start; }
 .search-input, .column, dialog.modal { background: rgba(15, 23, 42, .92); border: 1px solid rgba(148, 163, 184, .14); border-radius: 14px; }
 .primary-btn, .secondary-btn, .ghost-btn, .column-actions button, .card-actions button { border-radius: 10px; padding: 8px 10px; color: #fff; background: #2563eb; font-size: 12px; }
+.danger-btn { padding: 4px 8px !important; font-size: 10px !important; background: rgba(239, 68, 68, .18) !important; color: #fca5a5 !important; }
 .secondary-btn { background: #334155; }
 .ghost-btn { width: 100%; margin: 8px 0; background: rgba(37, 99, 235, .1); color: #93c5fd; border: 1px dashed rgba(147, 197, 253, .28); }
 .search-input { padding: 9px 10px; color: #fff; font-size: 12px; min-width: 0; flex: 1 1 auto; }
@@ -29,14 +30,13 @@ button { cursor: pointer; border: none; }
 .column-actions { display: flex; gap: 6px; }
 .column-actions button { background: rgba(51, 65, 85, .9); padding: 6px 8px; }
 .card-list { display: grid; gap: 8px; }
-.card { background: rgba(30, 41, 59, .96); border-radius: 12px; padding: 10px; border: 1px solid rgba(148, 163, 184, .12); }
+.card { background: rgba(30, 41, 59, .96); border-radius: 12px; padding: 10px; border: 1px solid rgba(148, 163, 184, .12); cursor: pointer; }
 .card strong, .card-head span { font-size: 12px; }
 .card > p { color: #cbd5e1; margin: 6px 0; font-size: 11px; }
 .card-meta { margin: 0; display: grid; gap: 4px; font-size: 10px; }
 .card-meta div { display: flex; justify-content: space-between; gap: 8px; color: #94a3b8; }
 .card-meta dd, .card-meta dt { margin: 0; }
-.card-actions { gap: 6px; }
-.card-actions button:last-child { background: rgba(239, 68, 68, .18); color: #fca5a5; }
+.card-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
 .empty-state { border: 1px dashed rgba(148, 163, 184, .16); border-radius: 12px; padding: 12px; color: #94a3b8; text-align: center; font-size: 11px; }
 
 dialog.modal { width: min(100%, 460px); color: #e2e8f0; padding: 16px; }

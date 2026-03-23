@@ -11,7 +11,6 @@ function createDefaultState() {
   return {
     columns: defaultColumns.map((title) => ({ id: createId('col'), title, cards: [] })),
     filters: { query: '' },
-    filters: { query: '', columnId: 'all' },
   }
 }
 

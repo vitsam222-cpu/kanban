@@ -19,10 +19,10 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return createDefaultState()
     const parsed = JSON.parse(raw)
-
     return {
       columns: Array.isArray(parsed.columns) ? parsed.columns : createDefaultState().columns,
       filters: { query: '' },
+      filters: { query: '', columnId: 'all' },
     }
   } catch {
     return createDefaultState()
@@ -45,14 +45,22 @@ function getColumnTotal(column) {
   return column.cards.reduce((sum, card) => sum + (Number(card.price) || 0), 0)
 }
 
-function getVisibleColumns() {
-  const query = state.filters.query.trim().toLowerCase()
+function getBoardBalance() {
+  return state.columns.reduce((sum, column) => {
+    const total = getColumnTotal(column)
+    return sum + (column.title.toLowerCase().includes('расход') ? -total : total)
+  }, 0)
+}
 
-  return state.columns.map((column) => ({
-    column,
-    visibleCards: query
-      ? column.cards.filter((card) => [card.client, card.service, card.messenger, card.phone].some((field) => String(field).toLowerCase().includes(query)))
-      : column.cards,
+function getVisibleColumns() {
+  const base = state.columns
+
+  const query = state.filters.query.trim().toLowerCase()
+  if (!query) return base
+
+  return base.map((column) => ({
+    ...column,
+    cards: column.cards.filter((card) => [card.client, card.service, card.messenger, card.phone].some((field) => String(field).toLowerCase().includes(query))),
   }))
 }
 
@@ -73,11 +81,11 @@ function openCardDialog(columnId, cardId = null) {
         <h3>${card ? 'Редактировать карточку' : 'Новая карточка'}</h3>
         <button type="button" data-close>✕</button>
       </div>
-      <label>Клиент<input name="client" required /></label>
-      <label>Услуга<input name="service" required /></label>
-      <label>Стоимость, ₽<input name="price" type="number" min="0" /></label>
-      <label>Мессенджер<input name="messenger" /></label>
-      <label>Телефон<input name="phone" /></label>
+      <label>Клиент<input name="client" required value="${card?.client ?? ''}" /></label>
+      <label>Услуга<input name="service" required value="${card?.service ?? ''}" /></label>
+      <label>Стоимость, ₽<input name="price" type="number" min="0" value="${card?.price ?? ''}" /></label>
+      <label>Мессенджер<input name="messenger" value="${card?.messenger ?? ''}" /></label>
+      <label>Телефон<input name="phone" value="${card?.phone ?? ''}" /></label>
       <div class="modal-actions">
         <button type="button" class="secondary-btn" data-close>Отмена</button>
         <button type="submit" class="primary-btn">Сохранить</button>
@@ -110,6 +118,24 @@ function openCardDialog(columnId, cardId = null) {
       cards: card
         ? columnState.cards.map((item) => (item.id === card.id ? { ...item, ...payload } : item))
         : [...columnState.cards, { id: createId('card'), ...payload }],
+  dialog.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => dialog.close()))
+  dialog.querySelector('form').addEventListener('submit', (event) => {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    const payload = Object.fromEntries(formData.entries())
+    const prepared = {
+      client: payload.client.trim(),
+      service: payload.service.trim(),
+      price: Number(payload.price) || 0,
+      messenger: payload.messenger.trim(),
+      phone: payload.phone.trim(),
+    }
+
+    updateColumn(columnId, (columnState) => ({
+      ...columnState,
+      cards: card
+        ? columnState.cards.map((item) => (item.id === card.id ? { ...item, ...prepared } : item))
+        : [...columnState.cards, { id: createId('card'), ...prepared }],
     }))
     dialog.close()
   })
@@ -136,6 +162,7 @@ function onDragStart(event) {
       cardId: cardEl.dataset.cardId,
       fromColumnId: cardEl.dataset.parentColumnId,
     }))
+    event.dataTransfer.setData('application/json', JSON.stringify({ type: 'card', cardId: cardEl.dataset.cardId, fromColumnId: cardEl.dataset.parentColumnId }))
     event.dataTransfer.effectAllowed = 'move'
     return
   }
@@ -181,6 +208,8 @@ function onDrop(event) {
     ? destinationColumn.cards.findIndex((item) => item.id === targetCard.dataset.cardId)
     : destinationColumn.cards.length
 
+  const [card] = sourceColumn.cards.splice(cardIndex, 1)
+  const insertIndex = targetCard ? destinationColumn.cards.findIndex((item) => item.id === targetCard.dataset.cardId) : destinationColumn.cards.length
   destinationColumn.cards.splice(insertIndex < 0 ? destinationColumn.cards.length : insertIndex, 0, card)
   saveState()
   render()
@@ -201,6 +230,26 @@ function render() {
 
       <main class="board-grid" id="board-grid">
         ${visibleColumns.map(({ column, visibleCards }) => {
+      <header class="topbar">
+        <div class="topbar-actions">
+          <div class="summary-card">
+            <span>Баланс по доске</span>
+            <strong>${formatCurrency(getBoardBalance())}</strong>
+          </div>
+          <button class="primary-btn" id="add-column-btn">+ Колонка</button>
+        </div>
+      </header>
+
+      <section class="toolbar">
+        <input class="search-input" id="search-input" placeholder="Поиск по клиентам, услугам, контактам" value="${state.filters.query}" />
+        <select class="filter-select" id="column-filter">
+          <option value="all">Все колонки</option>
+          ${state.columns.map((column) => `<option value="${column.id}" ${state.filters.columnId === column.id ? 'selected' : ''}>${column.title}</option>`).join('')}
+        </select>
+      </section>
+
+      <main class="board-grid" id="board-grid">
+        ${visibleColumns.map((column) => {
           const total = getColumnTotal(column)
           const tone = column.title.toLowerCase().includes('расход') ? 'expense' : 'income'
           return `
@@ -218,6 +267,7 @@ function render() {
               <button class="ghost-btn" data-action="add-card" data-column-id="${column.id}">+ Быстро добавить</button>
               <div class="card-list">
                 ${visibleCards.length ? visibleCards.map((card) => `
+                ${column.cards.length ? column.cards.map((card) => `
                   <article class="card" draggable="true" data-card-id="${card.id}" data-parent-column-id="${column.id}">
                     <div class="card-head">
                       <strong>${card.client}</strong>
@@ -253,6 +303,11 @@ function render() {
 
   document.querySelector('#search-input').addEventListener('input', (event) => {
     state.filters.query = event.target.value
+    render()
+  })
+
+  document.querySelector('#column-filter').addEventListener('change', (event) => {
+    state.filters.columnId = event.target.value
     render()
   })
 

@@ -11,6 +11,7 @@ function createDefaultState() {
   return {
     columns: defaultColumns.map((title) => ({ id: createId('col'), title, cards: [] })),
     filters: { query: '' },
+    filters: { query: '', columnId: 'all' },
   }
 }
 
@@ -22,6 +23,7 @@ function loadState() {
     return {
       columns: Array.isArray(parsed.columns) ? parsed.columns : createDefaultState().columns,
       filters: { query: '' },
+      filters: { query: '', columnId: 'all' },
     }
   } catch {
     return createDefaultState()
@@ -188,6 +190,24 @@ function render() {
         </div>
       </header>
 
+      <header class="topbar">
+        <div class="topbar-actions">
+          <div class="summary-card">
+            <span>Баланс по доске</span>
+            <strong>${formatCurrency(getBoardBalance())}</strong>
+          </div>
+          <button class="primary-btn" id="add-column-btn">+ Колонка</button>
+        </div>
+      </header>
+
+      <section class="toolbar">
+        <input class="search-input" id="search-input" placeholder="Поиск по клиентам, услугам, контактам" value="${state.filters.query}" />
+        <select class="filter-select" id="column-filter">
+          <option value="all">Все колонки</option>
+          ${state.columns.map((column) => `<option value="${column.id}" ${state.filters.columnId === column.id ? 'selected' : ''}>${column.title}</option>`).join('')}
+        </select>
+      </section>
+
       <main class="board-grid" id="board-grid">
         ${visibleColumns.map((column) => {
           const total = getColumnTotal(column)
@@ -241,6 +261,11 @@ function render() {
 
   document.querySelector('#search-input').addEventListener('input', (event) => {
     state.filters.query = event.target.value
+    render()
+  })
+
+  document.querySelector('#column-filter').addEventListener('change', (event) => {
+    state.filters.columnId = event.target.value
     render()
   })
 

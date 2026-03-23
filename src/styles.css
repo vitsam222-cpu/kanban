@@ -26,6 +26,7 @@ button { cursor: pointer; border: none; }
 .column-header { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
 .column-header h2, .modal-header h3 { margin: 0 0 4px; font-size: 13px; line-height: 1.2; }
 .column-header p { margin: 0; color: #e2e8f0; font-size: 16px; font-weight: 700; line-height: 1.1; }
+.column-header p { margin: 0; color: #cbd5e1; font-size: 11px; }
 .column-actions { display: flex; gap: 6px; }
 .column-actions button { background: rgba(51, 65, 85, .9); padding: 6px 8px; }
 .card-list { display: grid; gap: 8px; }

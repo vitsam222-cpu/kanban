@@ -186,95 +186,99 @@ function onDrop(event) {
   render()
 }
 
-function render(options = {}) {
+function render() {
   const app = document.querySelector('#app')
-  const visibleColumns = getVisibleColumns()
 
-  app.innerHTML = `
-    <div class="app-shell">
-      <header class="topbar toolbar-row">
-        <div class="toolbar-left">
-          <button class="primary-btn" id="add-column-btn">+ Колонка</button>
-          <input class="search-input" id="search-input" placeholder="Поиск по клиентам, услугам" value="${state.filters.query}" />
-        </div>
-      </header>
+  if (!app.querySelector('.app-shell')) {
+    app.innerHTML = `
+      <div class="app-shell">
+        <header class="topbar toolbar-row">
+          <div class="toolbar-left">
+            <button class="primary-btn" id="add-column-btn">+ Колонка</button>
+            <input class="search-input" id="search-input" placeholder="Поиск по клиентам, услугам" />
+          </div>
+        </header>
 
-      <main class="board-grid" id="board-grid">
-        ${visibleColumns.map(({ column, visibleCards }) => {
-          const total = getColumnTotal(column)
-          const tone = column.title.toLowerCase().includes('расход') ? 'expense' : 'income'
-          return `
-            <section class="column ${tone}" draggable="true" data-column-id="${column.id}">
-              <div class="column-header">
-                <div>
-                  <h2>${column.title}</h2>
-                  <p>${formatCurrency(total)}</p>
-                </div>
-                <div class="column-actions">
-                  <button data-action="rename-column" data-column-id="${column.id}">✎</button>
-                  <button data-action="delete-column" data-column-id="${column.id}">🗑</button>
-                </div>
-              </div>
-              <button class="ghost-btn" data-action="add-card" data-column-id="${column.id}">+ Быстро добавить</button>
-              <div class="card-list">
-                ${visibleCards.length ? visibleCards.map((card) => `
-                  <article class="card" draggable="true" data-card-id="${card.id}" data-parent-column-id="${column.id}">
-                    <div class="card-head">
-                      <strong>${card.client}</strong>
-                      <span>${formatCurrency(card.price)}</span>
-                    </div>
-                    <p>${card.service}</p>
-                    <dl class="card-meta">
-                      <div><dt>Мессенджер</dt><dd>${card.messenger || '—'}</dd></div>
-                      <div><dt>Телефон</dt><dd>${card.phone || '—'}</dd></div>
-                    </dl>
-                    <div class="card-actions">
-                      <button data-action="edit-card" data-column-id="${column.id}" data-card-id="${card.id}">Редактировать</button>
-                      <button data-action="delete-card" data-column-id="${column.id}" data-card-id="${card.id}">Удалить</button>
-                    </div>
-                  </article>
-                `).join('') : '<div class="empty-state">Перетащите сюда карточку или создайте новую.</div>'}
-              </div>
-            </section>
-          `
-        }).join('')}
-      </main>
-    </div>
-  `
+        <main class="board-grid" id="board-grid"></main>
+      </div>
+    `
 
-  document.querySelector('#add-column-btn').addEventListener('click', () => {
-    const title = prompt('Название новой колонки')
-    if (!title?.trim()) return
+    document.querySelector('#add-column-btn').addEventListener('click', () => {
+      const title = prompt('Название новой колонки')
+      if (!title?.trim()) return
 
-    state.columns.push({ id: createId('col'), title: title.trim(), cards: [] })
-    saveState()
-    render()
-  })
+      state.columns.push({ id: createId('col'), title: title.trim(), cards: [] })
+      saveState()
+      render()
+    })
 
-  document.querySelector('#search-input').addEventListener('input', (event) => {
-    state.filters.query = event.target.value
-    render({ focusSearch: true, caret: event.target.selectionStart ?? state.filters.query.length })
-  })
-
-  if (options.focusSearch) {
-    const searchInput = document.querySelector('#search-input')
-    searchInput.focus()
-    searchInput.setSelectionRange(options.caret, options.caret)
+    document.querySelector('#search-input').addEventListener('input', (event) => {
+      state.filters.query = event.target.value
+      render()
+    })
   }
 
-  app.querySelectorAll('[data-action="add-card"]').forEach((button) => button.addEventListener('click', () => openCardDialog(button.dataset.columnId)))
-  app.querySelectorAll('[data-action="edit-card"]').forEach((button) => button.addEventListener('click', () => openCardDialog(button.dataset.columnId, button.dataset.cardId)))
-  app.querySelectorAll('[data-action="delete-card"]').forEach((button) => button.addEventListener('click', () => {
+  const searchInput = document.querySelector('#search-input')
+  if (document.activeElement !== searchInput) {
+    searchInput.value = state.filters.query
+  }
+
+  const visibleColumns = getVisibleColumns()
+  const board = document.querySelector('#board-grid')
+  board.innerHTML = `
+    ${visibleColumns.map(({ column, visibleCards }) => {
+      const total = getColumnTotal(column)
+      const tone = column.title.toLowerCase().includes('расход') ? 'expense' : 'income'
+      return `
+        <section class="column ${tone}" draggable="true" data-column-id="${column.id}">
+          <div class="column-header">
+            <div>
+              <h2>${column.title}</h2>
+              <p>${formatCurrency(total)}</p>
+            </div>
+            <div class="column-actions">
+              <button data-action="rename-column" data-column-id="${column.id}">✎</button>
+              <button data-action="delete-column" data-column-id="${column.id}">🗑</button>
+            </div>
+          </div>
+          <button class="ghost-btn" data-action="add-card" data-column-id="${column.id}">+ Быстро добавить</button>
+          <div class="card-list">
+            ${visibleCards.length ? visibleCards.map((card) => `
+              <article class="card" draggable="true" data-card-id="${card.id}" data-parent-column-id="${column.id}">
+                <div class="card-head">
+                  <strong>${card.client}</strong>
+                  <span>${formatCurrency(card.price)}</span>
+                </div>
+                <p>${card.service}</p>
+                <dl class="card-meta">
+                  <div><dt>Мессенджер</dt><dd>${card.messenger || '—'}</dd></div>
+                  <div><dt>Телефон</dt><dd>${card.phone || '—'}</dd></div>
+                </dl>
+                <div class="card-actions">
+                  <button data-action="edit-card" data-column-id="${column.id}" data-card-id="${card.id}">Редактировать</button>
+                  <button data-action="delete-card" data-column-id="${column.id}" data-card-id="${card.id}">Удалить</button>
+                </div>
+              </article>
+            `).join('') : '<div class="empty-state">Перетащите сюда карточку или создайте новую.</div>'}
+          </div>
+        </section>
+      `
+    }).join('')}
+  `
+
+  board.querySelectorAll('[data-action="add-card"]').forEach((button) => button.addEventListener('click', () => openCardDialog(button.dataset.columnId)))
+  board.querySelectorAll('[data-action="edit-card"]').forEach((button) => button.addEventListener('click', () => openCardDialog(button.dataset.columnId, button.dataset.cardId)))
+  board.querySelectorAll('[data-action="delete-card"]').forEach((button) => button.addEventListener('click', () => {
     updateColumn(button.dataset.columnId, (column) => ({ ...column, cards: column.cards.filter((card) => card.id !== button.dataset.cardId) }))
   }))
-  app.querySelectorAll('[data-action="rename-column"]').forEach((button) => button.addEventListener('click', () => {
+  board.querySelectorAll('[data-action="rename-column"]').forEach((button) => button.addEventListener('click', () => {
     const column = state.columns.find((item) => item.id === button.dataset.columnId)
     const title = prompt('Новое название колонки', column?.title ?? '')
     if (!title?.trim()) return
 
     updateColumn(button.dataset.columnId, (columnState) => ({ ...columnState, title: title.trim() }))
   }))
-  app.querySelectorAll('[data-action="delete-column"]').forEach((button) => button.addEventListener('click', () => {
+  board.querySelectorAll('[data-action="delete-column"]').forEach((button) => button.addEventListener('click', () => {
     const column = state.columns.find((item) => item.id === button.dataset.columnId)
     if (!column || !confirm(`Удалить колонку «${column.title}» со всеми карточками?`)) return
 
@@ -283,8 +287,8 @@ function render(options = {}) {
     render()
   }))
 
-  app.querySelectorAll('[draggable="true"]').forEach((item) => item.addEventListener('dragstart', onDragStart))
-  app.querySelectorAll('[data-column-id], [data-card-id]').forEach((item) => {
+  board.querySelectorAll('[draggable="true"]').forEach((item) => item.addEventListener('dragstart', onDragStart))
+  board.querySelectorAll('[data-column-id], [data-card-id]').forEach((item) => {
     item.addEventListener('dragover', (event) => event.preventDefault())
     item.addEventListener('drop', onDrop)
   })

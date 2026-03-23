@@ -186,7 +186,7 @@ function onDrop(event) {
   render()
 }
 
-function render() {
+function render(options = {}) {
   const app = document.querySelector('#app')
   const visibleColumns = getVisibleColumns()
 
@@ -253,8 +253,14 @@ function render() {
 
   document.querySelector('#search-input').addEventListener('input', (event) => {
     state.filters.query = event.target.value
-    render()
+    render({ focusSearch: true, caret: event.target.selectionStart ?? state.filters.query.length })
   })
+
+  if (options.focusSearch) {
+    const searchInput = document.querySelector('#search-input')
+    searchInput.focus()
+    searchInput.setSelectionRange(options.caret, options.caret)
+  }
 
   app.querySelectorAll('[data-action="add-card"]').forEach((button) => button.addEventListener('click', () => openCardDialog(button.dataset.columnId)))
   app.querySelectorAll('[data-action="edit-card"]').forEach((button) => button.addEventListener('click', () => openCardDialog(button.dataset.columnId, button.dataset.cardId)))

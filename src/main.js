@@ -142,20 +142,17 @@ function getReminderLabel(card) {
   return `${statusMap[status] || 'Запланировано'}: ${formattedDate}${recurrence}`
 }
 
+function getNextReminderDate(card) {
+  if (!card.reminderDate) return ''
+  const recurrence = card.reminderRecurrence || 'day'
+  return addPeriod(card.reminderDate, recurrence)
+}
+
 function parseTags(raw) {
   return raw
     .split(',')
     .map((tag) => tag.trim())
     .filter(Boolean)
-}
-
-function getPriorityLabel(priority) {
-  const map = {
-    high: 'Высокий',
-    medium: 'Средний',
-    low: 'Низкий',
-  }
-  return map[priority] || 'Средний'
 }
 
 function cardMatchesFilters(card, query, reminderFilter) {
@@ -165,7 +162,6 @@ function cardMatchesFilters(card, query, reminderFilter) {
     card.service,
     card.messenger,
     card.phone,
-    getPriorityLabel(card.priority),
     ...tags,
   ].some((field) => String(field || '').toLowerCase().includes(query))
 
@@ -177,6 +173,16 @@ function cardMatchesFilters(card, query, reminderFilter) {
   return true
 }
 
+function compareCardsByReminderDate(a, b) {
+  const aDate = parseDateOnly(a.reminderDate)
+  const bDate = parseDateOnly(b.reminderDate)
+
+  if (aDate && bDate) return aDate - bDate
+  if (aDate) return -1
+  if (bDate) return 1
+  return 0
+}
+
 function getVisibleColumns() {
   const query = state.filters.query.trim().toLowerCase()
   const reminderFilter = state.filters.reminder
@@ -186,7 +192,9 @@ function getVisibleColumns() {
 
   return baseColumns.map((column) => ({
     column,
-    visibleCards: column.cards.filter((card) => cardMatchesFilters(card, query, reminderFilter)),
+    visibleCards: column.cards
+      .filter((card) => cardMatchesFilters(card, query, reminderFilter))
+      .sort(compareCardsByReminderDate),
   }))
 }
 
@@ -213,13 +221,6 @@ function openCardDialog(columnId, cardId = null) {
       <label>Мессенджер<input name="messenger" /></label>
       <label>Телефон<input name="phone" /></label>
       <label>Теги (через запятую)<input name="tags" placeholder="например: VIP, срочно" /></label>
-      <label>Приоритет
-        <select name="priority">
-          <option value="high">Высокий</option>
-          <option value="medium">Средний</option>
-          <option value="low">Низкий</option>
-        </select>
-      </label>
       <label>Дата напоминания<input name="reminderDate" type="date" /></label>
       <label>Цикличность
         <select name="reminderRecurrence">
@@ -243,7 +244,6 @@ function openCardDialog(columnId, cardId = null) {
   form.elements.messenger.value = card?.messenger ?? ''
   form.elements.phone.value = card?.phone ?? ''
   form.elements.tags.value = Array.isArray(card?.tags) ? card.tags.join(', ') : ''
-  form.elements.priority.value = card?.priority ?? 'medium'
   form.elements.reminderDate.value = card?.reminderDate ?? ''
   form.elements.reminderRecurrence.value = card?.reminderRecurrence ?? ''
 
@@ -258,7 +258,6 @@ function openCardDialog(columnId, cardId = null) {
       messenger: form.elements.messenger.value.trim(),
       phone: form.elements.phone.value.trim(),
       tags: parseTags(form.elements.tags.value),
-      priority: form.elements.priority.value || 'medium',
       reminderDate: form.elements.reminderDate.value || '',
       reminderRecurrence: form.elements.reminderRecurrence.value || '',
     }
@@ -373,8 +372,6 @@ function notifyDueReminders() {
   const dueCards = getReminderDueCards()
   if (!dueCards.length) return
 
-  let boardMutated = false
-
   dueCards.forEach(({ column, card }) => {
     const reminderKey = `${card.id}|${card.reminderDate}`
     if (reminderSeen[reminderKey]) return
@@ -384,21 +381,9 @@ function notifyDueReminders() {
     new Notification(title, { body })
 
     reminderSeen[reminderKey] = Date.now()
-
-    if (card.reminderRecurrence) {
-      const nextDate = addPeriod(card.reminderDate, card.reminderRecurrence)
-      if (nextDate) {
-        card.reminderDate = nextDate
-        boardMutated = true
-      }
-    }
   })
 
   saveReminderSeenMap()
-  if (boardMutated) {
-    saveState()
-    render()
-  }
 }
 
 function ensureReminderScheduler() {
@@ -419,10 +404,10 @@ function renderTags(tags = []) {
 
 function renderCard(card, columnId) {
   const reminderStatus = getReminderStatus(card)
-  const priority = card.priority || 'medium'
+  const canCompleteReminder = Boolean(card.reminderDate)
 
   return `
-    <article class="card reminder-${reminderStatus} priority-${priority}" draggable="true" data-card-id="${card.id}" data-parent-column-id="${columnId}">
+    <article class="card reminder-${reminderStatus}" draggable="true" data-card-id="${card.id}" data-parent-column-id="${columnId}">
       <div class="card-head">
         <strong>${card.client}</strong>
         <span>${formatCurrency(card.price)}</span>
@@ -430,12 +415,15 @@ function renderCard(card, columnId) {
       <p>${card.service}</p>
       ${renderTags(card.tags || [])}
       <dl class="card-meta">
-        <div><dt>Приоритет</dt><dd>${getPriorityLabel(priority)}</dd></div>
         <div><dt>Мессенджер</dt><dd>${card.messenger || '—'}</dd></div>
         <div><dt>Телефон</dt><dd>${card.phone || '—'}</dd></div>
         <div><dt>Напоминание</dt><dd>${getReminderLabel(card)}</dd></div>
       </dl>
       <div class="card-actions">
+        <label class="reminder-done">
+          <input type="checkbox" data-action="complete-reminder" data-column-id="${columnId}" data-card-id="${card.id}" ${canCompleteReminder ? '' : 'disabled'} />
+          <span>Выполнено</span>
+        </label>
         <button class="danger-btn" data-action="delete-card" data-column-id="${columnId}" data-card-id="${card.id}">Удалить</button>
       </div>
     </article>
@@ -477,6 +465,23 @@ function bindBoardEvents(board) {
       }))
     })
     button.addEventListener('dblclick', (event) => event.stopPropagation())
+  })
+
+  board.querySelectorAll('[data-action="complete-reminder"]').forEach((checkbox) => {
+    checkbox.addEventListener('click', (event) => event.stopPropagation())
+    checkbox.addEventListener('change', (event) => {
+      if (!event.target.checked) return
+
+      const { columnId, cardId } = checkbox.dataset
+      updateColumn(columnId, (column) => ({
+        ...column,
+        cards: column.cards.map((card) => {
+          if (card.id !== cardId || !card.reminderDate) return card
+          const nextDate = getNextReminderDate(card)
+          return nextDate ? { ...card, reminderDate: nextDate } : card
+        }),
+      }))
+    })
   })
 
   board.querySelectorAll('[data-card-id]').forEach((card) => {

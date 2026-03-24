@@ -1,0 +1,29 @@
+name: Verify static app
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - work
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check JavaScript syntax
+        run: node --check src/main.js
+
+      - name: Ensure only one header toolbar exists
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('src/main.js').read_text()
+          assert text.count('id="add-column-btn"') == 1, 'Expected exactly one + Column button in header markup'
+          assert text.count('id="search-input"') == 1, 'Expected exactly one search input in header markup'
+          assert 'Все колонки' not in text, 'Column filter markup should not exist'
+          assert 'Баланс по доске' not in text, 'Header total label should not exist'
+          PY

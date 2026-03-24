@@ -1,6 +1,8 @@
 const STORAGE_KEY = 'financial-kanban-board'
 const REMINDER_SEEN_KEY = 'financial-kanban-reminder-seen'
+const DEFAULT_BOARD_TITLE = 'Сделки'
 const DEFAULT_COLUMNS = ['Новые клиенты', 'На согласовании', 'Ожидание оплаты', 'Регулярные', 'Расходы', 'Клиенты ушли']
+const NEW_BOARD_COLUMNS = ['Сделать', 'В работе', 'Сделано']
 
 const state = loadState()
 const reminderSeen = loadReminderSeenMap()
@@ -11,12 +13,19 @@ function createId(prefix) {
 }
 
 function createDefaultState() {
-  return {
+  const defaultBoard = {
+    id: createId('board'),
+    title: DEFAULT_BOARD_TITLE,
     columns: DEFAULT_COLUMNS.map((title) => ({
       id: createId('col'),
       title,
       cards: [],
     })),
+  }
+
+  return {
+    boards: [defaultBoard],
+    activeBoardId: defaultBoard.id,
     filters: {
       query: '',
       reminder: 'all',
@@ -31,8 +40,23 @@ function loadState() {
     if (!raw) return createDefaultState()
 
     const parsed = JSON.parse(raw)
+    const fallback = createDefaultState()
+    const boards = Array.isArray(parsed.boards) && parsed.boards.length
+      ? parsed.boards
+      : Array.isArray(parsed.columns)
+        ? [{
+            id: createId('board'),
+            title: DEFAULT_BOARD_TITLE,
+            columns: parsed.columns,
+          }]
+        : fallback.boards
+    const activeBoardId = boards.some((board) => board.id === parsed.activeBoardId)
+      ? parsed.activeBoardId
+      : boards[0].id
+
     return {
-      columns: Array.isArray(parsed.columns) ? parsed.columns : createDefaultState().columns,
+      boards,
+      activeBoardId,
       filters: {
         query: '',
         reminder: 'all',
@@ -45,7 +69,10 @@ function loadState() {
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ columns: state.columns }))
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    boards: state.boards,
+    activeBoardId: state.activeBoardId,
+  }))
 }
 
 function loadReminderSeenMap() {
@@ -72,6 +99,10 @@ function formatCurrency(value) {
 
 function getColumnTotal(column) {
   return column.cards.reduce((sum, card) => sum + (Number(card.price) || 0), 0)
+}
+
+function getActiveBoard() {
+  return state.boards.find((board) => board.id === state.activeBoardId) || state.boards[0] || null
 }
 
 function parseDateOnly(value) {
@@ -186,9 +217,11 @@ function compareCardsByReminderDate(a, b) {
 function getVisibleColumns() {
   const query = state.filters.query.trim().toLowerCase()
   const reminderFilter = state.filters.reminder
+  const activeBoard = getActiveBoard()
+  if (!activeBoard) return []
   const baseColumns = state.filters.onlyExpenses
-    ? state.columns.filter((column) => column.title.toLowerCase().includes('расход'))
-    : state.columns
+    ? activeBoard.columns.filter((column) => column.title.toLowerCase().includes('расход'))
+    : activeBoard.columns
 
   return baseColumns.map((column) => ({
     column,
@@ -198,14 +231,21 @@ function getVisibleColumns() {
   }))
 }
 
-function updateColumn(columnId, updater) {
-  state.columns = state.columns.map((column) => (column.id === columnId ? updater(column) : column))
+function updateActiveBoard(updater) {
+  state.boards = state.boards.map((board) => (board.id === state.activeBoardId ? updater(board) : board))
   saveState()
   render()
 }
 
+function updateColumn(columnId, updater) {
+  updateActiveBoard((board) => ({
+    ...board,
+    columns: board.columns.map((column) => (column.id === columnId ? updater(column) : column)),
+  }))
+}
+
 function openCardDialog(columnId, cardId = null) {
-  const column = state.columns.find((item) => item.id === columnId)
+  const column = getActiveBoard()?.columns.find((item) => item.id === columnId)
   const card = column?.cards.find((item) => item.id === cardId)
   const dialog = document.createElement('dialog')
   dialog.className = 'modal'
@@ -319,11 +359,13 @@ function onDrop(event) {
   if (!targetColumn) return
 
   if (payload.type === 'column') {
-    const fromIndex = state.columns.findIndex((column) => column.id === payload.columnId)
-    const toIndex = state.columns.findIndex((column) => column.id === targetColumn.dataset.columnId)
+    const activeBoard = getActiveBoard()
+    if (!activeBoard) return
+    const fromIndex = activeBoard.columns.findIndex((column) => column.id === payload.columnId)
+    const toIndex = activeBoard.columns.findIndex((column) => column.id === targetColumn.dataset.columnId)
     if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return
 
-    state.columns = moveItem(state.columns, fromIndex, toIndex)
+    activeBoard.columns = moveItem(activeBoard.columns, fromIndex, toIndex)
     saveState()
     render()
     return
@@ -331,8 +373,10 @@ function onDrop(event) {
 
   if (payload.type !== 'card') return
 
-  const sourceColumn = state.columns.find((column) => column.id === payload.fromColumnId)
-  const destinationColumn = state.columns.find((column) => column.id === targetColumn.dataset.columnId)
+  const activeBoard = getActiveBoard()
+  if (!activeBoard) return
+  const sourceColumn = activeBoard.columns.find((column) => column.id === payload.fromColumnId)
+  const destinationColumn = activeBoard.columns.find((column) => column.id === targetColumn.dataset.columnId)
   if (!sourceColumn || !destinationColumn) return
 
   const cardIndex = sourceColumn.cards.findIndex((card) => card.id === payload.cardId)
@@ -353,12 +397,14 @@ function getReminderDueCards() {
   today.setHours(0, 0, 0, 0)
 
   const due = []
-  state.columns.forEach((column) => {
-    column.cards.forEach((card) => {
-      const reminder = parseDateOnly(card.reminderDate)
-      if (!reminder) return
-      reminder.setHours(0, 0, 0, 0)
-      if (reminder <= today) due.push({ column, card })
+  state.boards.forEach((board) => {
+    board.columns.forEach((column) => {
+      column.cards.forEach((card) => {
+        const reminder = parseDateOnly(card.reminderDate)
+        if (!reminder) return
+        reminder.setHours(0, 0, 0, 0)
+        if (reminder <= today) due.push({ board, column, card })
+      })
     })
   })
 
@@ -372,12 +418,12 @@ function notifyDueReminders() {
   const dueCards = getReminderDueCards()
   if (!dueCards.length) return
 
-  dueCards.forEach(({ column, card }) => {
+  dueCards.forEach(({ board, column, card }) => {
     const reminderKey = `${card.id}|${card.reminderDate}`
     if (reminderSeen[reminderKey]) return
 
     const title = card.client || 'Напоминание по карточке'
-    const body = `${card.service || 'Услуга'} • ${column.title}`
+    const body = `${card.service || 'Услуга'} • ${board.title} / ${column.title}`
     new Notification(title, { body })
 
     reminderSeen[reminderKey] = Date.now()
@@ -489,7 +535,7 @@ function bindBoardEvents(board) {
   })
 
   board.querySelectorAll('[data-action="rename-column"]').forEach((button) => button.addEventListener('click', () => {
-    const column = state.columns.find((item) => item.id === button.dataset.columnId)
+    const column = getActiveBoard()?.columns.find((item) => item.id === button.dataset.columnId)
     const title = prompt('Новое название колонки', column?.title ?? '')
     if (!title?.trim()) return
 
@@ -497,12 +543,13 @@ function bindBoardEvents(board) {
   }))
 
   board.querySelectorAll('[data-action="delete-column"]').forEach((button) => button.addEventListener('click', () => {
-    const column = state.columns.find((item) => item.id === button.dataset.columnId)
+    const column = getActiveBoard()?.columns.find((item) => item.id === button.dataset.columnId)
     if (!column || !confirm(`Удалить колонку «${column.title}» со всеми карточками?`)) return
 
-    state.columns = state.columns.filter((item) => item.id !== button.dataset.columnId)
-    saveState()
-    render()
+    updateActiveBoard((boardState) => ({
+      ...boardState,
+      columns: boardState.columns.filter((item) => item.id !== button.dataset.columnId),
+    }))
   }))
 
   board.querySelectorAll('[draggable="true"]').forEach((item) => item.addEventListener('dragstart', onDragStart))
@@ -539,12 +586,15 @@ function updateNotificationButton() {
 
 function render() {
   const app = document.querySelector('#app')
+  const activeBoard = getActiveBoard()
 
   if (!app.querySelector('.app-shell')) {
     app.innerHTML = `
       <div class="app-shell">
         <header class="topbar toolbar-row">
           <div class="toolbar-left">
+            <select class="filter-select" id="board-select"></select>
+            <button class="secondary-btn" id="add-board-btn">+ Доска</button>
             <button class="primary-btn" id="add-column-btn">+ Колонка</button>
             <input class="search-input" id="search-input" placeholder="Поиск по клиентам, услугам" />
             <select class="filter-select" id="reminder-filter">
@@ -560,11 +610,34 @@ function render() {
       </div>
     `
 
+    document.querySelector('#add-board-btn').addEventListener('click', () => {
+      const title = prompt('Название новой доски')
+      if (!title?.trim()) return
+
+      const board = {
+        id: createId('board'),
+        title: title.trim(),
+        columns: NEW_BOARD_COLUMNS.map((columnTitle) => ({ id: createId('col'), title: columnTitle, cards: [] })),
+      }
+
+      state.boards.push(board)
+      state.activeBoardId = board.id
+      saveState()
+      render()
+    })
+
+    document.querySelector('#board-select').addEventListener('change', (event) => {
+      state.activeBoardId = event.target.value
+      render()
+    })
+
     document.querySelector('#add-column-btn').addEventListener('click', () => {
+      const board = getActiveBoard()
+      if (!board) return
       const title = prompt('Название новой колонки')
       if (!title?.trim()) return
 
-      state.columns.push({ id: createId('col'), title: title.trim(), cards: [] })
+      board.columns.push({ id: createId('col'), title: title.trim(), cards: [] })
       saveState()
       render()
     })
@@ -591,6 +664,12 @@ function render() {
       updateNotificationButton()
     })
   }
+
+  const boardSelect = document.querySelector('#board-select')
+  boardSelect.innerHTML = state.boards.map((board) => `
+    <option value="${board.id}">${board.title}</option>
+  `).join('')
+  boardSelect.value = activeBoard?.id || ''
 
   const searchInput = document.querySelector('#search-input')
   if (document.activeElement !== searchInput) {

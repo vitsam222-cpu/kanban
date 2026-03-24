@@ -638,10 +638,10 @@ function renderCard(card, columnId) {
   return `
     <article class="card reminder-${reminderStatus} ${isCompleted ? 'card-completed' : ''}" draggable="true" data-card-id="${card.id}" data-parent-column-id="${columnId}">
       <div class="card-head">
-        <strong>${card.client}</strong>
+        <strong>${card.service}</strong>
         <span>${formatCurrency(card.price)}</span>
       </div>
-      <p>${card.service}</p>
+      <p>${card.client}</p>
       ${renderTags(card.tags || [])}
       <dl class="card-meta">
         <div><dt>Мессенджер</dt><dd>${card.messenger || '—'}</dd></div>

@@ -89,6 +89,93 @@ function saveReminderSeenMap() {
   localStorage.setItem(REMINDER_SEEN_KEY, JSON.stringify(reminderSeen))
 }
 
+function normalizeImportedState(candidate) {
+  const fallback = createDefaultState()
+  if (!candidate || typeof candidate !== 'object') return fallback
+
+  const parseBoards = (boards) => boards
+    .filter((board) => board && typeof board === 'object')
+    .map((board) => ({
+      id: board.id || createId('board'),
+      title: String(board.title || 'Без названия'),
+      columns: Array.isArray(board.columns)
+        ? board.columns
+          .filter((column) => column && typeof column === 'object')
+          .map((column) => ({
+            id: column.id || createId('col'),
+            title: String(column.title || 'Колонка'),
+            cards: Array.isArray(column.cards) ? column.cards : [],
+          }))
+        : [],
+    }))
+    .filter((board) => board.columns.length > 0)
+
+  let boards = []
+  if (Array.isArray(candidate.boards)) {
+    boards = parseBoards(candidate.boards)
+  } else if (Array.isArray(candidate.columns)) {
+    boards = parseBoards([{
+      id: createId('board'),
+      title: DEFAULT_BOARD_TITLE,
+      columns: candidate.columns,
+    }])
+  }
+
+  if (!boards.length) return fallback
+
+  const activeBoardId = boards.some((board) => board.id === candidate.activeBoardId)
+    ? candidate.activeBoardId
+    : boards[0].id
+
+  return {
+    boards,
+    activeBoardId,
+    filters: { ...fallback.filters },
+  }
+}
+
+function exportData() {
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    state: {
+      boards: state.boards,
+      activeBoardId: state.activeBoardId,
+    },
+    reminderSeen,
+  }
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `kanban-export-${new Date().toISOString().slice(0, 10)}.json`
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+async function importData(file) {
+  if (!file) return
+  const raw = await file.text()
+  const parsed = JSON.parse(raw)
+  const importedState = normalizeImportedState(parsed.state || parsed)
+
+  state.boards = importedState.boards
+  state.activeBoardId = importedState.activeBoardId
+  state.filters = importedState.filters
+
+  Object.keys(reminderSeen).forEach((key) => delete reminderSeen[key])
+  if (parsed.reminderSeen && typeof parsed.reminderSeen === 'object') {
+    Object.entries(parsed.reminderSeen).forEach(([key, value]) => {
+      reminderSeen[key] = value
+    })
+  }
+
+  saveState()
+  saveReminderSeenMap()
+  render()
+}
+
 function formatCurrency(value) {
   return new Intl.NumberFormat('ru-RU', {
     style: 'currency',
@@ -617,6 +704,9 @@ function render() {
               <option value="overdue">Только просроченные</option>
             </select>
             <label class="checkbox-filter"><input id="expense-filter" type="checkbox" /> Только расходы</label>
+            <button class="secondary-btn" id="export-data-btn">Экспорт</button>
+            <button class="secondary-btn" id="import-data-btn">Импорт</button>
+            <input id="import-file-input" type="file" accept="application/json" hidden />
             <button class="secondary-btn" id="enable-notifications-btn">Включить напоминания</button>
           </div>
         </header>
@@ -671,6 +761,22 @@ function render() {
       const result = await Notification.requestPermission()
       if (result === 'granted') notifyDueReminders()
       updateNotificationButton()
+    })
+
+    document.querySelector('#export-data-btn').addEventListener('click', exportData)
+
+    const importFileInput = document.querySelector('#import-file-input')
+    document.querySelector('#import-data-btn').addEventListener('click', () => importFileInput.click())
+    importFileInput.addEventListener('change', async (event) => {
+      const [file] = event.target.files || []
+      if (!file) return
+      try {
+        await importData(file)
+      } catch (error) {
+        alert(`Не удалось импортировать файл: ${error.message}`)
+      } finally {
+        event.target.value = ''
+      }
     })
   }
 

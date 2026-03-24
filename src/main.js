@@ -205,6 +205,10 @@ function cardMatchesFilters(card, query, reminderFilter) {
 }
 
 function compareCardsByReminderDate(a, b) {
+  const aCompleted = Boolean(a.completed)
+  const bCompleted = Boolean(b.completed)
+  if (aCompleted !== bCompleted) return aCompleted ? 1 : -1
+
   const aDate = parseDateOnly(a.reminderDate)
   const bDate = parseDateOnly(b.reminderDate)
 
@@ -450,10 +454,11 @@ function renderTags(tags = []) {
 
 function renderCard(card, columnId) {
   const reminderStatus = getReminderStatus(card)
+  const isCompleted = Boolean(card.completed)
   const canCompleteReminder = Boolean(card.reminderDate)
 
   return `
-    <article class="card reminder-${reminderStatus}" draggable="true" data-card-id="${card.id}" data-parent-column-id="${columnId}">
+    <article class="card reminder-${reminderStatus} ${isCompleted ? 'card-completed' : ''}" draggable="true" data-card-id="${card.id}" data-parent-column-id="${columnId}">
       <div class="card-head">
         <strong>${card.client}</strong>
         <span>${formatCurrency(card.price)}</span>
@@ -467,8 +472,8 @@ function renderCard(card, columnId) {
       </dl>
       <div class="card-actions">
         <label class="reminder-done">
-          <input type="checkbox" data-action="complete-reminder" data-column-id="${columnId}" data-card-id="${card.id}" ${canCompleteReminder ? '' : 'disabled'} />
-          <span>Выполнено</span>
+          <input type="checkbox" data-action="complete-reminder" data-column-id="${columnId}" data-card-id="${card.id}" ${canCompleteReminder ? '' : 'disabled'} ${isCompleted ? 'checked' : ''} />
+          <span>${isCompleted ? 'Завершено' : 'Выполнено'}</span>
         </label>
         <button class="danger-btn" data-action="delete-card" data-column-id="${columnId}" data-card-id="${card.id}">Удалить</button>
       </div>
@@ -516,15 +521,21 @@ function bindBoardEvents(board) {
   board.querySelectorAll('[data-action="complete-reminder"]').forEach((checkbox) => {
     checkbox.addEventListener('click', (event) => event.stopPropagation())
     checkbox.addEventListener('change', (event) => {
-      if (!event.target.checked) return
-
       const { columnId, cardId } = checkbox.dataset
       updateColumn(columnId, (column) => ({
         ...column,
         cards: column.cards.map((card) => {
           if (card.id !== cardId || !card.reminderDate) return card
+          if (!event.target.checked) return { ...card, completed: false, completedAt: null }
+
+          if (!card.reminderRecurrence) {
+            return { ...card, completed: true, completedAt: Date.now() }
+          }
+
           const nextDate = getNextReminderDate(card)
-          return nextDate ? { ...card, reminderDate: nextDate } : card
+          return nextDate
+            ? { ...card, reminderDate: nextDate, completed: false, completedAt: null }
+            : card
         }),
       }))
     })

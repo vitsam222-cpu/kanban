@@ -146,6 +146,17 @@ dialog.modal,
   cursor: pointer;
 }
 
+.card-completed {
+  background: rgba(20, 83, 45, .32);
+  border-color: rgba(74, 222, 128, .45);
+}
+
+.card-completed strong,
+.card-completed p,
+.card-completed .card-meta {
+  opacity: .72;
+}
+
 .card strong,
 .card-head span { font-size: 12px; }
 

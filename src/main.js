@@ -295,6 +295,67 @@ function mergeTagOptions(tags = []) {
   })
 }
 
+function initTagEditor(form, initialTags = []) {
+  const editor = form.querySelector('[data-tag-editor]')
+  const list = editor.querySelector('.tag-editor-list')
+  const input = editor.querySelector('input[name="tagsInput"]')
+  const hidden = form.elements.tags
+  let tags = [...initialTags]
+
+  const sync = () => {
+    hidden.value = tags.join(', ')
+    list.innerHTML = tags.map((tag, index) => `
+      <button type="button" class="tag-token" data-remove-tag="${index}">
+        <span>${tag}</span>
+        <span>×</span>
+      </button>
+    `).join('')
+
+    list.querySelectorAll('[data-remove-tag]').forEach((button) => {
+      button.addEventListener('click', () => {
+        tags = tags.filter((_, idx) => idx !== Number(button.dataset.removeTag))
+        sync()
+        input.focus()
+      })
+    })
+  }
+
+  const addTag = (raw) => {
+    const tag = String(raw || '').trim().replace(/^#/, '')
+    if (!tag) return
+    if (tags.some((item) => item.toLowerCase() === tag.toLowerCase())) return
+    tags.push(tag)
+    sync()
+    input.value = ''
+    input.focus()
+  }
+
+  input.addEventListener('keydown', (event) => {
+    const shouldCreate = event.key === 'Tab' || event.key === 'Enter' || event.key === ','
+    if (shouldCreate && input.value.trim()) {
+      event.preventDefault()
+      addTag(input.value)
+      return
+    }
+
+    if (event.key === 'Backspace' && !input.value && tags.length) {
+      tags.pop()
+      sync()
+      event.preventDefault()
+    }
+  })
+
+  input.addEventListener('blur', () => {
+    if (input.value.trim()) addTag(input.value)
+  })
+
+  sync()
+
+  return {
+    getTags: () => [...tags],
+  }
+}
+
 function cardMatchesFilters(card, query, reminderFilter) {
   const tags = Array.isArray(card.tags) ? card.tags : []
   const textMatches = !query || [
@@ -370,12 +431,15 @@ function openCardDialog(columnId, cardId = null) {
       </div>
       <label>Задача<input name="service" required /></label>
       <label>Клиент<input name="client" required /></label>
-      <label>Теги
-        <input name="tags" list="tags-memory-list" placeholder="#VIP, #срочно" />
-        <datalist id="tags-memory-list">
-          ${state.tagOptions.map((tag) => `<option value="#${tag}"></option>`).join('')}
-        </datalist>
-      </label>
+      <label>Теги</label>
+      <div class="tag-editor" data-tag-editor>
+        <div class="tag-editor-list"></div>
+        <input name="tagsInput" list="tags-memory-list" placeholder="Введите тег и нажмите Tab" />
+      </div>
+      <input name="tags" type="hidden" />
+      <datalist id="tags-memory-list">
+        ${state.tagOptions.map((tag) => `<option value="${tag}"></option>`).join('')}
+      </datalist>
       <label>Стоимость, ₽<input name="price" type="number" min="0" /></label>
       <label>Мессенджер<input name="messenger" /></label>
       <label>Телефон<input name="phone" /></label>
@@ -396,9 +460,9 @@ function openCardDialog(columnId, cardId = null) {
   `
 
   const form = dialog.querySelector('form')
+  const tagEditor = initTagEditor(form, Array.isArray(card?.tags) ? card.tags : [])
   form.elements.service.value = card?.service ?? ''
   form.elements.client.value = card?.client ?? ''
-  form.elements.tags.value = Array.isArray(card?.tags) ? card.tags.map((tag) => `#${tag}`).join(', ') : ''
   form.elements.price.value = card?.price ?? ''
   form.elements.messenger.value = card?.messenger ?? ''
   form.elements.phone.value = card?.phone ?? ''
@@ -415,7 +479,7 @@ function openCardDialog(columnId, cardId = null) {
       price: Number(form.elements.price.value) || 0,
       messenger: form.elements.messenger.value.trim(),
       phone: form.elements.phone.value.trim(),
-      tags: parseTags(form.elements.tags.value),
+      tags: tagEditor.getTags(),
       reminderDate: form.elements.reminderDate.value || '',
       reminderRecurrence: form.elements.reminderRecurrence.value || '',
     }

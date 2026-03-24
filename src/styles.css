@@ -292,6 +292,47 @@ dialog.modal::backdrop { background: rgba(2, 6, 23, .72); }
   font-size: 12px;
 }
 
+.tag-editor {
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, .18);
+  background: #0f172a;
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.tag-editor-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-editor input[name="tagsInput"] {
+  border: none;
+  background: transparent;
+  padding: 2px 4px;
+  min-width: 140px;
+  flex: 1;
+}
+
+.tag-editor input[name="tagsInput"]:focus {
+  outline: none;
+}
+
+.tag-token {
+  border-radius: 999px;
+  border: 1px solid rgba(96, 165, 250, .45);
+  background: rgba(37, 99, 235, .2);
+  color: #bfdbfe;
+  font-size: 11px;
+  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 @media (max-width: 1024px) {
   .app-shell { padding: 10px; }
   .toolbar-row { align-items: stretch; }

@@ -455,7 +455,6 @@ function renderTags(tags = []) {
 function renderCard(card, columnId) {
   const reminderStatus = getReminderStatus(card)
   const isCompleted = Boolean(card.completed)
-  const canCompleteReminder = Boolean(card.reminderDate)
 
   return `
     <article class="card reminder-${reminderStatus} ${isCompleted ? 'card-completed' : ''}" draggable="true" data-card-id="${card.id}" data-parent-column-id="${columnId}">
@@ -472,7 +471,7 @@ function renderCard(card, columnId) {
       </dl>
       <div class="card-actions">
         <label class="reminder-done">
-          <input type="checkbox" data-action="complete-reminder" data-column-id="${columnId}" data-card-id="${card.id}" ${canCompleteReminder ? '' : 'disabled'} ${isCompleted ? 'checked' : ''} />
+          <input type="checkbox" data-action="complete-reminder" data-column-id="${columnId}" data-card-id="${card.id}" ${isCompleted ? 'checked' : ''} />
           <span>${isCompleted ? 'Завершено' : 'Выполнено'}</span>
         </label>
         <button class="danger-btn" data-action="delete-card" data-column-id="${columnId}" data-card-id="${card.id}">Удалить</button>
@@ -525,10 +524,14 @@ function bindBoardEvents(board) {
       updateColumn(columnId, (column) => ({
         ...column,
         cards: column.cards.map((card) => {
-          if (card.id !== cardId || !card.reminderDate) return card
+          if (card.id !== cardId) return card
           if (!event.target.checked) return { ...card, completed: false, completedAt: null }
 
           if (!card.reminderRecurrence) {
+            return { ...card, completed: true, completedAt: Date.now() }
+          }
+
+          if (!card.reminderDate) {
             return { ...card, completed: true, completedAt: Date.now() }
           }
 

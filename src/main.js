@@ -26,6 +26,7 @@ function createDefaultState() {
   return {
     boards: [defaultBoard],
     activeBoardId: defaultBoard.id,
+    tagOptions: [],
     filters: {
       query: '',
       reminder: 'all',
@@ -57,6 +58,7 @@ function loadState() {
     return {
       boards,
       activeBoardId,
+      tagOptions: Array.isArray(parsed.tagOptions) ? parsed.tagOptions : [],
       filters: {
         query: '',
         reminder: 'all',
@@ -72,6 +74,7 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     boards: state.boards,
     activeBoardId: state.activeBoardId,
+    tagOptions: state.tagOptions,
   }))
 }
 
@@ -130,6 +133,7 @@ function normalizeImportedState(candidate) {
   return {
     boards,
     activeBoardId,
+    tagOptions: Array.isArray(candidate.tagOptions) ? candidate.tagOptions : [...fallback.tagOptions],
     filters: { ...fallback.filters },
   }
 }
@@ -141,6 +145,7 @@ function exportData() {
     state: {
       boards: state.boards,
       activeBoardId: state.activeBoardId,
+      tagOptions: state.tagOptions,
     },
     reminderSeen,
   }
@@ -162,6 +167,7 @@ async function importData(file) {
 
   state.boards = importedState.boards
   state.activeBoardId = importedState.activeBoardId
+  state.tagOptions = importedState.tagOptions
   state.filters = importedState.filters
 
   Object.keys(reminderSeen).forEach((key) => delete reminderSeen[key])
@@ -271,6 +277,22 @@ function parseTags(raw) {
     .split(',')
     .map((tag) => tag.trim())
     .filter(Boolean)
+    .map((tag) => tag.replace(/^#/, '').trim())
+    .filter(Boolean)
+}
+
+function mergeTagOptions(tags = []) {
+  const normalized = tags
+    .map((tag) => String(tag || '').replace(/^#/, '').trim())
+    .filter(Boolean)
+  if (!normalized.length) return
+
+  const seen = new Set(state.tagOptions.map((tag) => tag.toLowerCase()))
+  normalized.forEach((tag) => {
+    if (seen.has(tag.toLowerCase())) return
+    state.tagOptions.push(tag)
+    seen.add(tag.toLowerCase())
+  })
 }
 
 function cardMatchesFilters(card, query, reminderFilter) {
@@ -346,12 +368,17 @@ function openCardDialog(columnId, cardId = null) {
         <h3>${card ? 'Редактировать карточку' : 'Новая карточка'}</h3>
         <button type="button" data-close>✕</button>
       </div>
+      <label>Задача<input name="service" required /></label>
       <label>Клиент<input name="client" required /></label>
-      <label>Услуга<input name="service" required /></label>
+      <label>Теги
+        <input name="tags" list="tags-memory-list" placeholder="#VIP, #срочно" />
+        <datalist id="tags-memory-list">
+          ${state.tagOptions.map((tag) => `<option value="#${tag}"></option>`).join('')}
+        </datalist>
+      </label>
       <label>Стоимость, ₽<input name="price" type="number" min="0" /></label>
       <label>Мессенджер<input name="messenger" /></label>
       <label>Телефон<input name="phone" /></label>
-      <label>Теги (через запятую)<input name="tags" placeholder="например: VIP, срочно" /></label>
       <label>Дата напоминания<input name="reminderDate" type="date" /></label>
       <label>Цикличность
         <select name="reminderRecurrence">
@@ -369,12 +396,12 @@ function openCardDialog(columnId, cardId = null) {
   `
 
   const form = dialog.querySelector('form')
-  form.elements.client.value = card?.client ?? ''
   form.elements.service.value = card?.service ?? ''
+  form.elements.client.value = card?.client ?? ''
+  form.elements.tags.value = Array.isArray(card?.tags) ? card.tags.map((tag) => `#${tag}`).join(', ') : ''
   form.elements.price.value = card?.price ?? ''
   form.elements.messenger.value = card?.messenger ?? ''
   form.elements.phone.value = card?.phone ?? ''
-  form.elements.tags.value = Array.isArray(card?.tags) ? card.tags.join(', ') : ''
   form.elements.reminderDate.value = card?.reminderDate ?? ''
   form.elements.reminderRecurrence.value = card?.reminderRecurrence ?? ''
 
@@ -394,6 +421,7 @@ function openCardDialog(columnId, cardId = null) {
     }
 
     if (!payload.client || !payload.service) return
+    mergeTagOptions(payload.tags)
 
     updateColumn(columnId, (columnState) => ({
       ...columnState,

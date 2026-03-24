@@ -38,12 +38,14 @@ button {
 }
 
 .topbar { margin-bottom: 8px; flex-wrap: nowrap; }
-.toolbar-left { flex-wrap: nowrap; width: 100%; justify-content: flex-start; }
+.toolbar-left { flex-wrap: wrap; width: 100%; justify-content: flex-start; }
 .toolbar-row { justify-content: flex-start; }
 
 .search-input,
+.filter-select,
 .column,
-dialog.modal {
+dialog.modal,
+.checkbox-filter {
   background: rgba(15, 23, 42, .92);
   border: 1px solid rgba(148, 163, 184, .14);
   border-radius: 14px;
@@ -72,13 +74,26 @@ dialog.modal {
   border: 1px dashed rgba(147, 197, 253, .28);
 }
 
-.search-input {
+.search-input,
+.filter-select {
   padding: 9px 10px;
   color: #fff;
   font-size: 12px;
   min-width: 0;
-  flex: 1 1 auto;
 }
+
+.search-input { flex: 1 1 260px; }
+.filter-select { width: 220px; }
+
+.checkbox-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.checkbox-filter input { accent-color: #2563eb; }
 
 .board-grid {
   display: grid;
@@ -140,6 +155,21 @@ dialog.modal {
   font-size: 11px;
 }
 
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.tag-chip {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, .2);
+  color: #93c5fd;
+}
+
 .card-meta {
   margin: 0;
   display: grid;
@@ -162,6 +192,24 @@ dialog.modal {
   justify-content: flex-end;
   margin-top: 8px;
 }
+
+.reminder-overdue {
+  box-shadow: inset 0 0 0 1px rgba(248, 113, 113, .5);
+  background: rgba(127, 29, 29, .25);
+}
+
+.reminder-today {
+  box-shadow: inset 0 0 0 1px rgba(250, 204, 21, .5);
+  background: rgba(120, 53, 15, .18);
+}
+
+.reminder-soon {
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, .45);
+}
+
+.priority-high { border-left: 3px solid #f87171; }
+.priority-medium { border-left: 3px solid #fbbf24; }
+.priority-low { border-left: 3px solid #34d399; }
 
 .empty-state {
   border: 1px dashed rgba(148, 163, 184, .16);
@@ -188,7 +236,8 @@ dialog.modal::backdrop { background: rgba(2, 6, 23, .72); }
   font-size: 12px;
 }
 
-.modal-form input {
+.modal-form input,
+.modal-form select {
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, .18);
   background: #0f172a;
@@ -202,6 +251,7 @@ dialog.modal::backdrop { background: rgba(2, 6, 23, .72); }
   .toolbar-row { align-items: stretch; }
   .toolbar-left { width: 100%; }
   .search-input { flex: 1 1 220px; }
+  .filter-select { width: 180px; }
   .board-grid { grid-template-columns: repeat(6, minmax(140px, 168px)); }
 }
 

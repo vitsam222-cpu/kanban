@@ -41,6 +41,27 @@ button {
 .toolbar-left { flex-wrap: wrap; width: 100%; justify-content: flex-start; }
 .toolbar-row { justify-content: flex-start; }
 
+.board-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.board-tab {
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, .22);
+  background: rgba(30, 41, 59, .88);
+  color: #cbd5e1;
+  font-size: 12px;
+  padding: 7px 10px;
+}
+
+.board-tab.is-active {
+  background: rgba(37, 99, 235, .24);
+  border-color: rgba(96, 165, 250, .55);
+  color: #dbeafe;
+}
+
 .search-input,
 .filter-select,
 .column,

@@ -604,7 +604,7 @@ function render() {
       <div class="app-shell">
         <header class="topbar toolbar-row">
           <div class="toolbar-left">
-            <select class="filter-select" id="board-select"></select>
+            <div class="board-tabs" id="board-tabs"></div>
             <button class="secondary-btn" id="add-board-btn">+ Доска</button>
             <button class="primary-btn" id="add-column-btn">+ Колонка</button>
             <input class="search-input" id="search-input" placeholder="Поиск по клиентам, услугам" />
@@ -634,11 +634,6 @@ function render() {
       state.boards.push(board)
       state.activeBoardId = board.id
       saveState()
-      render()
-    })
-
-    document.querySelector('#board-select').addEventListener('change', (event) => {
-      state.activeBoardId = event.target.value
       render()
     })
 
@@ -676,11 +671,21 @@ function render() {
     })
   }
 
-  const boardSelect = document.querySelector('#board-select')
-  boardSelect.innerHTML = state.boards.map((board) => `
-    <option value="${board.id}">${board.title}</option>
+  const boardTabs = document.querySelector('#board-tabs')
+  boardTabs.innerHTML = state.boards.map((board) => `
+    <button
+      class="board-tab ${board.id === activeBoard?.id ? 'is-active' : ''}"
+      data-action="switch-board"
+      data-board-id="${board.id}"
+      type="button"
+    >${board.title}</button>
   `).join('')
-  boardSelect.value = activeBoard?.id || ''
+  boardTabs.querySelectorAll('[data-action="switch-board"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.activeBoardId = button.dataset.boardId
+      render()
+    })
+  })
 
   const searchInput = document.querySelector('#search-input')
   if (document.activeElement !== searchInput) {

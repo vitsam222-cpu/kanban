@@ -288,8 +288,13 @@ dialog.modal::backdrop { background: rgba(2, 6, 23, .72); }
   align-items: center;
 }
 
-.template-row select {
-  flex: 1;
+.template-buttons {
+  flex-wrap: wrap;
+}
+
+.template-btn {
+  font-size: 11px;
+  padding: 6px 9px;
 }
 
 .modal-form input,

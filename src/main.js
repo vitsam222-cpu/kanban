@@ -3,10 +3,9 @@ const REMINDER_SEEN_KEY = 'financial-kanban-reminder-seen'
 const DEFAULT_BOARD_TITLE = 'Сделки'
 const DEFAULT_COLUMNS = ['Новые клиенты', 'На согласовании', 'Ожидание оплаты', 'Регулярные', 'Расходы', 'Клиенты ушли']
 const NEW_BOARD_COLUMNS = ['Сделать', 'В работе', 'Сделано']
-const CARD_TEMPLATES = [
-  { id: 'consulting', title: 'Консультация', service: 'Консультация', price: 5000, tags: ['консалтинг'] },
-  { id: 'ads-month', title: 'Ведение рекламы', service: 'Ведение рекламы (месяц)', price: 30000, tags: ['реклама'] },
-  { id: 'expense-tools', title: 'Расход: инструменты', service: 'Оплата сервисов/инструментов', price: 7000, tags: ['расход'] },
+const DEFAULT_CARD_TEMPLATES = [
+  { id: 'tpl-seo-monthly', title: 'СЕО', service: 'СЕО', price: 0, tags: ['сео'], reminderRecurrence: 'month', reminderCustomDays: 0 },
+  { id: 'tpl-direct-monthly', title: 'Директ', service: 'Директ', price: 40000, tags: ['директ'], reminderRecurrence: 'month', reminderCustomDays: 0 },
 ]
 
 const state = loadState()
@@ -33,6 +32,7 @@ function createDefaultState() {
     boards: [defaultBoard],
     activeBoardId: defaultBoard.id,
     tagOptions: [],
+    customTemplates: [],
     filters: {
       query: '',
       reminder: 'all',
@@ -65,6 +65,7 @@ function loadState() {
       boards,
       activeBoardId,
       tagOptions: Array.isArray(parsed.tagOptions) ? parsed.tagOptions : [],
+      customTemplates: Array.isArray(parsed.customTemplates) ? parsed.customTemplates : [],
       filters: {
         query: '',
         reminder: 'all',
@@ -81,6 +82,7 @@ function saveState() {
     boards: state.boards,
     activeBoardId: state.activeBoardId,
     tagOptions: state.tagOptions,
+    customTemplates: state.customTemplates,
   }))
 }
 
@@ -140,6 +142,7 @@ function normalizeImportedState(candidate) {
     boards,
     activeBoardId,
     tagOptions: Array.isArray(candidate.tagOptions) ? candidate.tagOptions : [...fallback.tagOptions],
+    customTemplates: Array.isArray(candidate.customTemplates) ? candidate.customTemplates : [...fallback.customTemplates],
     filters: { ...fallback.filters },
   }
 }
@@ -152,6 +155,7 @@ function exportData() {
       boards: state.boards,
       activeBoardId: state.activeBoardId,
       tagOptions: state.tagOptions,
+      customTemplates: state.customTemplates,
     },
     reminderSeen,
   }
@@ -174,6 +178,7 @@ async function importData(file) {
   state.boards = importedState.boards
   state.activeBoardId = importedState.activeBoardId
   state.tagOptions = importedState.tagOptions
+  state.customTemplates = importedState.customTemplates
   state.filters = importedState.filters
 
   Object.keys(reminderSeen).forEach((key) => delete reminderSeen[key])
@@ -331,6 +336,10 @@ function undoLastAction() {
   render()
 }
 
+function getAllTemplates() {
+  return [...DEFAULT_CARD_TEMPLATES, ...state.customTemplates]
+}
+
 function initTagEditor(form, initialTags = []) {
   const editor = form.querySelector('[data-tag-editor]')
   const list = editor.querySelector('.tag-editor-list')
@@ -471,13 +480,14 @@ function openCardDialog(columnId, cardId = null) {
       </div>
       <label>Задача<input name="service" required /></label>
       <label>Быстрый шаблон
-        <div class="template-row">
-          <select name="cardTemplate">
-            <option value="">Выберите шаблон</option>
-            ${CARD_TEMPLATES.map((template) => `<option value="${template.id}">${template.title}</option>`).join('')}
-          </select>
-          <button type="button" class="secondary-btn" data-action="apply-template">Применить</button>
+        <div class="template-row template-buttons" data-template-buttons>
+          ${getAllTemplates().map((template) => `
+            <button type="button" class="secondary-btn template-btn" data-template-id="${template.id}">
+              ${template.title}
+            </button>
+          `).join('')}
         </div>
+        <button type="button" class="secondary-btn" data-action="save-template">+ Сохранить как шаблон</button>
       </label>
       <label>Клиент<input name="client" required /></label>
       <label>Теги</label>
@@ -541,16 +551,48 @@ function openCardDialog(columnId, cardId = null) {
     customDaysInput.value = Number(card.reminderCustomDays)
   }
 
-  form.querySelector('[data-action="apply-template"]').addEventListener('click', () => {
-    const templateId = form.elements.cardTemplate.value
-    const template = CARD_TEMPLATES.find((item) => item.id === templateId)
-    if (!template) return
-
+  const applyTemplate = (template) => {
     form.elements.service.value = template.service || ''
     form.elements.price.value = Number(template.price) > 0 ? Number(template.price) : ''
     tagEditor.setTags(Array.isArray(template.tags) ? template.tags : [])
     mergeTagOptions(Array.isArray(template.tags) ? template.tags : [])
+    setRecurrence(template.reminderRecurrence || 'none')
+    form.elements.reminderCustomDays.value = Number(template.reminderCustomDays) > 0 ? Number(template.reminderCustomDays) : ''
     form.elements.client.focus()
+  }
+
+  const templateButtonsWrap = form.querySelector('[data-template-buttons]')
+  templateButtonsWrap.querySelectorAll('[data-template-id]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const template = getAllTemplates().find((item) => item.id === button.dataset.templateId)
+      if (!template) return
+      applyTemplate(template)
+    })
+  })
+
+  form.querySelector('[data-action="save-template"]').addEventListener('click', () => {
+    const title = prompt('Название шаблона', form.elements.service.value.trim() || 'Новый шаблон')
+    if (!title?.trim()) return
+
+    const template = {
+      id: createId('tpl'),
+      title: title.trim(),
+      service: form.elements.service.value.trim(),
+      price: Number(form.elements.price.value) || 0,
+      tags: tagEditor.getTags(),
+      reminderRecurrence: form.elements.reminderRecurrence.value || '',
+      reminderCustomDays: Number(form.elements.reminderCustomDays.value) || 0,
+    }
+    state.customTemplates.push(template)
+    saveState()
+
+    const templateButton = document.createElement('button')
+    templateButton.type = 'button'
+    templateButton.className = 'secondary-btn template-btn'
+    templateButton.dataset.templateId = template.id
+    templateButton.textContent = template.title
+    templateButton.addEventListener('click', () => applyTemplate(template))
+    templateButtonsWrap.append(templateButton)
   })
 
   dialog.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => dialog.close()))

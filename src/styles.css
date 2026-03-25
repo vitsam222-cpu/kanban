@@ -333,6 +333,27 @@ dialog.modal::backdrop { background: rgba(2, 6, 23, .72); }
   gap: 6px;
 }
 
+.recurrence-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.recurrence-btn {
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, .24);
+  background: rgba(30, 41, 59, .92);
+  color: #cbd5e1;
+  font-size: 11px;
+  padding: 7px 10px;
+}
+
+.recurrence-btn.is-active {
+  background: rgba(37, 99, 235, .24);
+  border-color: rgba(96, 165, 250, .55);
+  color: #dbeafe;
+}
+
 @media (max-width: 1024px) {
   .app-shell { padding: 10px; }
   .toolbar-row { align-items: stretch; }

@@ -212,13 +212,15 @@ function formatDateOnly(date) {
   return `${year}-${month}-${day}`
 }
 
-function addPeriod(dateString, recurrence) {
+function addPeriod(dateString, recurrence, customDays = 0) {
   const date = parseDateOnly(dateString)
   if (!date) return ''
 
   if (recurrence === 'day') date.setDate(date.getDate() + 1)
   if (recurrence === 'week') date.setDate(date.getDate() + 7)
   if (recurrence === 'month') date.setMonth(date.getMonth() + 1)
+  if (recurrence === 'year') date.setFullYear(date.getFullYear() + 1)
+  if (recurrence === 'custom' && Number(customDays) > 0) date.setDate(date.getDate() + Number(customDays))
 
   return formatDateOnly(date)
 }
@@ -247,9 +249,11 @@ function getReminderLabel(card) {
   if (!card.reminderDate) return '—'
 
   const recurrenceMap = {
+    none: 'Без повторения',
     day: 'Каждый день',
     week: 'Каждую неделю',
     month: 'Каждый месяц',
+    year: 'Каждый год',
   }
 
   const statusMap = {
@@ -261,7 +265,12 @@ function getReminderLabel(card) {
 
   const parsed = parseDateOnly(card.reminderDate)
   const formattedDate = parsed ? new Intl.DateTimeFormat('ru-RU').format(parsed) : card.reminderDate
-  const recurrence = card.reminderRecurrence ? ` · ${recurrenceMap[card.reminderRecurrence]}` : ''
+  let recurrence = ''
+  if (card.reminderRecurrence === 'custom' && Number(card.reminderCustomDays) > 0) {
+    recurrence = ` · Каждые ${Number(card.reminderCustomDays)} дн.`
+  } else if (card.reminderRecurrence) {
+    recurrence = ` · ${recurrenceMap[card.reminderRecurrence] || recurrenceMap.none}`
+  }
   const status = getReminderStatus(card)
   return `${statusMap[status] || 'Запланировано'}: ${formattedDate}${recurrence}`
 }
@@ -269,7 +278,7 @@ function getReminderLabel(card) {
 function getNextReminderDate(card) {
   if (!card.reminderDate) return ''
   const recurrence = card.reminderRecurrence || 'day'
-  return addPeriod(card.reminderDate, recurrence)
+  return addPeriod(card.reminderDate, recurrence, card.reminderCustomDays)
 }
 
 function parseTags(raw) {
@@ -444,13 +453,18 @@ function openCardDialog(columnId, cardId = null) {
       <label>Мессенджер<input name="messenger" /></label>
       <label>Телефон<input name="phone" /></label>
       <label>Дата напоминания<input name="reminderDate" type="date" /></label>
-      <label>Цикличность
-        <select name="reminderRecurrence">
-          <option value="">Без повторения</option>
-          <option value="day">Каждый день</option>
-          <option value="week">Каждую неделю</option>
-          <option value="month">Каждый месяц</option>
-        </select>
+      <label>Цикличность</label>
+      <div class="recurrence-buttons" data-recurrence-group>
+        <button type="button" class="recurrence-btn" data-recurrence="none">Без повторения</button>
+        <button type="button" class="recurrence-btn" data-recurrence="day">Каждый день</button>
+        <button type="button" class="recurrence-btn" data-recurrence="week">Каждую неделю</button>
+        <button type="button" class="recurrence-btn" data-recurrence="month">Каждый месяц</button>
+        <button type="button" class="recurrence-btn" data-recurrence="year">Каждый год</button>
+        <button type="button" class="recurrence-btn" data-recurrence="custom">Через N дней</button>
+      </div>
+      <input name="reminderRecurrence" type="hidden" value="none" />
+      <label>Через сколько дней
+        <input name="reminderCustomDays" type="number" min="1" step="1" placeholder="Например, 10" />
       </label>
       <div class="modal-actions">
         <button type="button" class="secondary-btn" data-close>Отмена</button>
@@ -467,7 +481,25 @@ function openCardDialog(columnId, cardId = null) {
   form.elements.messenger.value = card?.messenger ?? ''
   form.elements.phone.value = card?.phone ?? ''
   form.elements.reminderDate.value = card?.reminderDate ?? ''
-  form.elements.reminderRecurrence.value = card?.reminderRecurrence ?? ''
+  form.elements.reminderCustomDays.value = Number(card?.reminderCustomDays) > 0 ? Number(card.reminderCustomDays) : ''
+
+  const recurrenceButtons = Array.from(form.querySelectorAll('[data-recurrence]'))
+  const customDaysInput = form.elements.reminderCustomDays
+  const setRecurrence = (value) => {
+    const normalized = value || 'none'
+    form.elements.reminderRecurrence.value = normalized
+    recurrenceButtons.forEach((button) => button.classList.toggle('is-active', button.dataset.recurrence === normalized))
+    customDaysInput.disabled = normalized !== 'custom'
+    if (normalized !== 'custom') customDaysInput.value = ''
+  }
+
+  recurrenceButtons.forEach((button) => {
+    button.addEventListener('click', () => setRecurrence(button.dataset.recurrence))
+  })
+  setRecurrence(card?.reminderRecurrence || 'none')
+  if ((card?.reminderRecurrence || 'none') === 'custom' && Number(card?.reminderCustomDays) > 0) {
+    customDaysInput.value = Number(card.reminderCustomDays)
+  }
 
   dialog.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => dialog.close()))
   form.addEventListener('submit', (event) => {
@@ -481,7 +513,8 @@ function openCardDialog(columnId, cardId = null) {
       phone: form.elements.phone.value.trim(),
       tags: tagEditor.getTags(),
       reminderDate: form.elements.reminderDate.value || '',
-      reminderRecurrence: form.elements.reminderRecurrence.value || '',
+      reminderRecurrence: form.elements.reminderRecurrence.value === 'none' ? '' : form.elements.reminderRecurrence.value,
+      reminderCustomDays: Number(form.elements.reminderCustomDays.value) > 0 ? Number(form.elements.reminderCustomDays.value) : 0,
     }
 
     if (!payload.client || !payload.service) return

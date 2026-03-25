@@ -3,10 +3,16 @@ const REMINDER_SEEN_KEY = 'financial-kanban-reminder-seen'
 const DEFAULT_BOARD_TITLE = 'Сделки'
 const DEFAULT_COLUMNS = ['Новые клиенты', 'На согласовании', 'Ожидание оплаты', 'Регулярные', 'Расходы', 'Клиенты ушли']
 const NEW_BOARD_COLUMNS = ['Сделать', 'В работе', 'Сделано']
+const CARD_TEMPLATES = [
+  { id: 'consulting', title: 'Консультация', service: 'Консультация', price: 5000, tags: ['консалтинг'] },
+  { id: 'ads-month', title: 'Ведение рекламы', service: 'Ведение рекламы (месяц)', price: 30000, tags: ['реклама'] },
+  { id: 'expense-tools', title: 'Расход: инструменты', service: 'Оплата сервисов/инструментов', price: 7000, tags: ['расход'] },
+]
 
 const state = loadState()
 const reminderSeen = loadReminderSeenMap()
 let reminderSchedulerStarted = false
+const undoStack = []
 
 function createId(prefix) {
   return `${prefix}-${crypto.randomUUID()}`
@@ -304,6 +310,27 @@ function mergeTagOptions(tags = []) {
   })
 }
 
+function pushUndoAction(action) {
+  undoStack.push(action)
+  if (undoStack.length > 30) undoStack.shift()
+}
+
+function undoLastAction() {
+  const action = undoStack.pop()
+  if (!action) return
+  if (action.type !== 'delete-card') return
+
+  const board = state.boards.find((item) => item.id === action.boardId)
+  const column = board?.columns.find((item) => item.id === action.columnId)
+  if (!column) return
+  if (column.cards.some((card) => card.id === action.card.id)) return
+
+  const insertIndex = Math.max(0, Math.min(action.index, column.cards.length))
+  column.cards.splice(insertIndex, 0, action.card)
+  saveState()
+  render()
+}
+
 function initTagEditor(form, initialTags = []) {
   const editor = form.querySelector('[data-tag-editor]')
   const list = editor.querySelector('.tag-editor-list')
@@ -362,6 +389,10 @@ function initTagEditor(form, initialTags = []) {
 
   return {
     getTags: () => [...tags],
+    setTags: (nextTags = []) => {
+      tags = [...nextTags]
+      sync()
+    },
   }
 }
 
@@ -439,6 +470,15 @@ function openCardDialog(columnId, cardId = null) {
         <button type="button" data-close>✕</button>
       </div>
       <label>Задача<input name="service" required /></label>
+      <label>Быстрый шаблон
+        <div class="template-row">
+          <select name="cardTemplate">
+            <option value="">Выберите шаблон</option>
+            ${CARD_TEMPLATES.map((template) => `<option value="${template.id}">${template.title}</option>`).join('')}
+          </select>
+          <button type="button" class="secondary-btn" data-action="apply-template">Применить</button>
+        </div>
+      </label>
       <label>Клиент<input name="client" required /></label>
       <label>Теги</label>
       <div class="tag-editor" data-tag-editor>
@@ -500,6 +540,18 @@ function openCardDialog(columnId, cardId = null) {
   if ((card?.reminderRecurrence || 'none') === 'custom' && Number(card?.reminderCustomDays) > 0) {
     customDaysInput.value = Number(card.reminderCustomDays)
   }
+
+  form.querySelector('[data-action="apply-template"]').addEventListener('click', () => {
+    const templateId = form.elements.cardTemplate.value
+    const template = CARD_TEMPLATES.find((item) => item.id === templateId)
+    if (!template) return
+
+    form.elements.service.value = template.service || ''
+    form.elements.price.value = Number(template.price) > 0 ? Number(template.price) : ''
+    tagEditor.setTags(Array.isArray(template.tags) ? template.tags : [])
+    mergeTagOptions(Array.isArray(template.tags) ? template.tags : [])
+    form.elements.client.focus()
+  })
 
   dialog.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => dialog.close()))
   form.addEventListener('submit', (event) => {
@@ -721,6 +773,19 @@ function bindBoardEvents(board) {
 
   board.querySelectorAll('[data-action="delete-card"]').forEach((button) => {
     button.addEventListener('click', () => {
+      const column = getActiveBoard()?.columns.find((item) => item.id === button.dataset.columnId)
+      const index = column?.cards.findIndex((card) => card.id === button.dataset.cardId) ?? -1
+      const cardToDelete = index >= 0 ? column.cards[index] : null
+      if (cardToDelete) {
+        pushUndoAction({
+          type: 'delete-card',
+          boardId: state.activeBoardId,
+          columnId: button.dataset.columnId,
+          card: structuredClone(cardToDelete),
+          index,
+        })
+      }
+
       updateColumn(button.dataset.columnId, (column) => ({
         ...column,
         cards: column.cards.filter((card) => card.id !== button.dataset.cardId),
@@ -886,6 +951,14 @@ function render() {
       const result = await Notification.requestPermission()
       if (result === 'granted') notifyDueReminders()
       updateNotificationButton()
+    })
+
+    document.addEventListener('keydown', (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z') return
+      const activeTag = document.activeElement?.tagName?.toLowerCase()
+      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') return
+      event.preventDefault()
+      undoLastAction()
     })
 
     document.querySelector('#export-data-btn').addEventListener('click', exportData)
